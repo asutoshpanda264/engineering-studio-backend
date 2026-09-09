@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: engineering-studio-api
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/engineering_studio}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+
+  jpa:
+    # `validate`, never `update`/`create` — Flyway (db/migration/) is the
+    # single source of schema truth. Hibernate only checks the entity
+    # mappings agree with whatever schema Flyway already produced, and
+    # fails fast at startup if they've drifted apart, instead of silently
+    # patching the schema to match Java code (which is exactly the
+    # unreviewable, unreproducible drift Flyway was chosen to avoid —
+    # see decisions.md #4).
+    hibernate:
+      ddl-auto: validate
+    # Disables Open Session In View — with it on (Spring Boot's default),
+    # Hibernate keeps the DB session open for the entire request including
+    # view rendering, which invites lazy-loading queries to fire outside
+    # the service layer's transaction boundary, hiding N+1s. Off means any
+    # lazy association accessed outside a @Transactional method throws
+    # immediately in dev, which is the point — better to find that at
+    # dev-time than in a prod stack trace.
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    # Flyway's own `${placeholder}` templating is unrelated to Postgres's
+    # dollar-quoting ($tag$...$tag$) — but the two collide textually: a
+    # dollar-quote tag immediately followed by JSON content starting with
+    # `{` (e.g. `$j${"type":"constant",...}`, from the scenario seed
+    # migration) reads to Flyway's parser as an unconfigured `${...}`
+    # placeholder reference and fails the whole migration. This project has
+    # no legitimate use for Flyway placeholders, so disabling the feature
+    # entirely avoids this collision for every current and future
+    # JSON-embedding migration, not just the one that first hit it — see
+    # masterdoc/phase-2-scenario-crud/decisions.md.
+    placeholder-replacement: false
+
+app:
+  jwt:
+    # Dev-only fallback — real deploys must set JWT_SECRET explicitly.
+    # HS256 requires >= 256 bits; this default is well over that so local
+    # dev never fails on key length, only on "don't use this in prod."
+    secret: ${JWT_SECRET:dev-only-secret-change-me-before-any-real-deployment-not-for-production-use}
+    access-ttl-minutes: 15
+    refresh-ttl-days: 30
+  verify-service:
+    base-url: ${VERIFY_SERVICE_URL:http://localhost:4000}
+    timeout-seconds: 10
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

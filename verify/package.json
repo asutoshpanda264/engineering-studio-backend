@@ -1,0 +1,24 @@
+{
+  "name": "engineering-studio-verify",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side simulation verification service for Engineering Studio — reuses the frontend's own discrete-event engine to compute a submitted architecture's canonical score, so it never has to be trusted from the client.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sync-vendor": "./sync-vendor.sh"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}
