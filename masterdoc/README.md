@@ -29,13 +29,22 @@ starts, not pre-scaffolded ahead of time.
 | 3 | Attempt state machine (verify stubbed) | ✅ done | `phase-3-attempt-state-machine/` |
 | 4 | Node verify-service, real integration | ✅ done | `phase-4-verify-service-integration/` |
 | 5 | Points + `PointsLedger` + upgrade-only `ProblemProgress` | ✅ done | `phase-5-points-and-progress/` |
-| 6 | Redis leaderboards (3 ZSETs) | 🔲 not started | — |
-| 7 | Daily challenge + streaks | 🔲 not started | — |
-| 8 | Caching + rate limiting | 🔲 not started | — |
-| 9 | AI assistant seam (entities/endpoints only) | 🔲 not started | — |
+| 6 | Redis leaderboards (3 ZSETs) | ✅ done | `phase-6-leaderboards/` |
+| 7 | Daily challenge + streaks | ✅ done | `phase-7-daily-challenge-streaks/` |
+| 8 | Caching + rate limiting | ✅ done | `phase-8-caching-and-rate-limiting/` |
+| 9 | AI assistant seam (entities/endpoints only) | 🔲 not started (deferred — see below) | — |
 
-Full scope of each phase is in the approved build plan:
+Full scope of each numbered phase is in the approved build plan:
 `/home/asutosh/.claude/plans/lets-dicuss-more-what-zany-swing.md`.
+
+**Not one of the 9 numbered phases — a separate initiative, started once
+Phase 8 gave the frontend something real to connect to:**
+
+| Phase | Status | Folder |
+|---|---|---|
+| Frontend Integration — connecting `engineering_studio` (sibling repo) to this backend | ✅ Increments 1-5 done (auth foundation + Timed Challenge attempt/submit + leaderboard/daily-challenge pages + Workshop header signed-in indicator + NO_PRESSURE/free-play wiring) | `phase-frontend-integration/` |
+
+Milestone 9 is deliberately on hold until this is done.
 
 ## Quick "I want to know X" lookup
 
@@ -75,3 +84,78 @@ Full scope of each phase is in the approved build plan:
   `phase-5-points-and-progress/decisions.md` #5 (an `AccessDeniedException`
   regression in shared error-handling, caught by re-running an
   already-passing earlier phase's tests).
+- *"How do the 3 Redis leaderboards actually update, and why doesn't NO_PRESSURE
+  ever show up on one?"* → `phase-6-leaderboards/explain_leaderboard.md`.
+- *"Why does the leaderboard update wait for AFTER_COMMIT instead of updating
+  Redis immediately?"* → `phase-6-leaderboards/decisions.md` #3 — includes a
+  real testing consequence (AFTER_COMMIT listeners never fire under the default
+  rollback-wrapped test transaction) and the same class-level exception
+  `ProblemProgressConcurrencyTest` (Phase 5) already established.
+- *"Why is there no `testcontainers-redis` dependency?"* →
+  `phase-6-leaderboards/decisions.md` #6 — no such module exists in this
+  project's pinned Testcontainers BOM; Redis integration tests use a plain
+  `GenericContainer` instead, verified against the actual jars, not guessed.
+- *"Why did `ProblemProgressConcurrencyTest`'s cleanup change during Phase 6,
+  when nothing about that test's own logic did?"* →
+  `phase-6-leaderboards/decisions.md` #7, Finding B — the same
+  re-run-earlier-phases'-tests practice that caught Phase 5's
+  `AccessDeniedException` regression, catching a different kind of bug this
+  time (a shared-resource side effect, not a shared-code regression).
+- *"How does the daily challenge get picked, and why doesn't the 10pm
+  admin-reminder feature exist yet?"* →
+  `phase-7-daily-challenge-streaks/decisions.md` #1.
+- *"Why does solving today's challenge in NO_PRESSURE mode keep my streak
+  alive but never show up on a leaderboard?"* →
+  `phase-7-daily-challenge-streaks/decisions.md` #3 and
+  `explain_dailychallenge.md`'s last section — two separate, precisely-scoped
+  domain events, confirmed as the intended product behavior.
+- *"Why does `LeaderboardService` listen AFTER_COMMIT but `DailyChallengeService`
+  doesn't?"* → `phase-7-daily-challenge-streaks/decisions.md` #4 — the
+  mirror image of `phase-6-leaderboards/decisions.md` #3's reasoning:
+  Redis needs it (not a JPA resource), Postgres-to-Postgres doesn't.
+- *"What's the Hibernate first-level-cache gotcha with native `@Modifying`
+  queries?"* → `phase-7-daily-challenge-streaks/decisions.md` #6 — a real
+  bug caught on the first test run, with the `clearAutomatically = true`
+  fix and why Phase 5's `ensureRowExists` never hit the same issue.
+- *"How does scenario caching work, and how is it kept correct?"* →
+  `phase-8-caching-and-rate-limiting/explain_caching_and_ratelimit.md`.
+- *"Why did caching a `record` DTO throw `NotSerializableException`?"* →
+  `phase-8-caching-and-rate-limiting/decisions.md` #11 — `RedisCacheManager`'s
+  default value serializer needs `java.io.Serializable`; fixed with the
+  Jackson-3.x `GenericJacksonJsonRedisSerializer`.
+- *"How does rate limiting work, and why didn't it break every existing
+  test the moment it shipped?"* →
+  `phase-8-caching-and-rate-limiting/explain_caching_and_ratelimit.md`
+  and `decisions.md` #10 — a new `application-test.yml` keeps the "test"
+  Spring profile's limits effectively off; only `RateLimitIntegrationTest`
+  turns them back down, via `@TestPropertySource`.
+- *"Why does `AbstractIntegrationTest` clear every cache after each
+  test?"* → `phase-8-caching-and-rate-limiting/decisions.md` #12 — the
+  same cross-test Redis-leakage class of issue Phase 6/7 hit with their
+  own explicit writes, this time from an ordinary cached read.
+- *"Is the frontend actually connected to this backend yet? What changed
+  on the frontend side?"* → `phase-frontend-integration/README.md` — the
+  full file list on both sides, and `explain_frontend_integration.md` for
+  how the two apps actually talk to each other.
+- *"Why does signing in never gate anything a guest could already do?"* →
+  `phase-frontend-integration/decisions.md` #1 — a deliberate, confirmed
+  design choice (a signed-in session is additive, matching how LeetCode
+  itself works), not an oversight.
+- *"Where are the leaderboard and daily-challenge pages, and how does
+  solving the daily challenge actually get credited?"* →
+  `phase-frontend-integration/decisions.md` #13-16 and
+  `explain_frontend_integration.md`'s Increment 3 section — no new
+  attempt-flow wiring, just a deep-link into Increment 2's existing
+  Timed Challenge path plus Phase 7's own event listener.
+- *"Does free play (the default, untimed Workshop experience) create
+  real backend attempts now?"* → `phase-frontend-integration/decisions.md`
+  #18 and `explain_frontend_integration.md`'s Increment 5 section — yes,
+  since Increment 5: a NO_PRESSURE attempt starts on scenario load,
+  submits on the first passing run, and a fresh one opens immediately
+  after so a later, better run can submit again.
+- *"Why did a signed-in student's Timed Challenge (or free-play) attempt
+  sometimes silently never reach the backend at all?"* →
+  `phase-frontend-integration/decisions.md` #19 — a real race between
+  `ScenarioDeepLink`'s mount effect and auth bootstrap's `/me` call,
+  found during Increment 5's live testing and fixed there (affected both
+  modes, not something Increment 5 introduced).

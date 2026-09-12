@@ -9,10 +9,16 @@ see `decisions.md` (global) or a phase folder's own `decisions.md`.
 
 The backend for Engineering Studio (a distributed-systems learning sandbox —
 see the frontend repo at `../engineering_studio`, a sibling directory, not
-part of this repo). The frontend is, and stays, a static Next.js app with no
-backend of its own; this repo is the new system of record for everything
-that needs to persist across sessions or be trusted (who's who, what's been
+part of this repo). This repo is the system of record for everything that
+needs to persist across sessions or be trusted (who's who, what's been
 solved, who's ranked where).
+
+The frontend was originally scoped as a permanently static, no-backend
+Next.js app — that changed with a deliberate, confirmed product pivot
+(see `phase-frontend-integration/`), and Phases 1-8 here exist specifically
+to give it something real to connect to. Guest/local-only usage of the
+frontend stays fully intact regardless — a signed-in session (wired up
+starting in `phase-frontend-integration/`) is additive, never required.
 
 Two services, one repo (`decisions.md` #7 — started as two separate repos,
 deliberately combined once it was clear that cost nothing real for a
@@ -40,16 +46,17 @@ and how they talk to each other.
 | Package | Owns | Status |
 |---|---|---|
 | `auth` | Users, roles, login/register/refresh/logout, JWT issuance+validation | ✅ built — `phase-1-auth-rbac/explain_auth.md` |
-| `config` | Cross-cutting beans: security filter chain, JWT properties, `Clock`, `PasswordEncoder` | ✅ built |
+| `config` | Cross-cutting beans: security filter chain, JWT properties, `Clock`, `PasswordEncoder`, Redis cache config (`CacheConfig`) | ✅ built |
 | `common.error` | The one exception type (`ApiException`) and the one error response shape (`ApiError`) used everywhere | ✅ built |
-| `admin` | Currently just the RBAC smoke-test endpoint (`/admin/ping`); real user/role-management endpoints land later | 🚧 placeholder only |
-| `scenario` | Scenario CRUD, draft→publish workflow, versioning, the 32-scenario seed | ✅ built — `phase-2-scenario-crud/explain_scenario.md` |
+| `common.ratelimit` | Hand-rolled Redis fixed-window rate limiter (`RateLimiter`) + the filter applying it to auth/submit | ✅ built — `phase-8-caching-and-rate-limiting/explain_caching_and_ratelimit.md` |
+| `admin` | Currently just the RBAC smoke-test endpoint (`/admin/ping`) plus two small real admin actions (leaderboard rebuild, daily-challenge assignment); a full user/role-management surface lands later | 🚧 placeholder only |
+| `scenario` | Scenario CRUD, draft→publish workflow, versioning, the 32-scenario seed, Redis-backed caching on the public reads | ✅ built — `phase-2-scenario-crud/explain_scenario.md` (CRUD), `phase-8-caching-and-rate-limiting/explain_caching_and_ratelimit.md` (caching) |
 | `common.json` | `JsonUtil` — the one place JSON-string-in-the-database meets typed-object-in-Java | ✅ built |
 | `attempt` | The start/pause/resume/submit state machine, server-authoritative elapsed time, calls `verify/` over real HTTP | ✅ built — `phase-3-attempt-state-machine/explain_attempt.md` (state machine), `phase-4-verify-service-integration/` (the real verify call) |
 | `points` | The points formula (pure, unit-tested), `PointsLedger` | ✅ built — `phase-5-points-and-progress/explain_points.md` |
 | `progress` | Per-user per-scenario `ProblemProgress` (upgrade-only, concurrency-safe); plain completion-tracking for lessons/LLD/interview-Qs still deferred | ✅ built (scenario progress) — `phase-5-points-and-progress/explain_points.md` |
-| `leaderboard` | The 3 Redis-ZSET-backed leaderboards | 🔲 not yet built |
-| `dailychallenge` | Daily challenge calendar + streaks | 🔲 not yet built |
+| `leaderboard` | The 3 Redis-ZSET-backed leaderboards (most/best/fastest-solved), kept in sync via a domain event off `progress` | ✅ built — `phase-6-leaderboards/explain_leaderboard.md` |
+| `dailychallenge` | Daily challenge calendar (auto-random + admin override) + streaks, kept in sync via a domain event off `progress` | ✅ built — `phase-7-daily-challenge-streaks/explain_dailychallenge.md` |
 | `ai` | Seam only for a future AI design-review assistant — entities/endpoints, no logic | 🔲 not yet built |
 
 Full detail on what each package will do (points formula, leaderboard
