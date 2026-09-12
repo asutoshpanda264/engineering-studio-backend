@@ -1,13 +1,19 @@
 package com.engineeringstudio.api.support;
 
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Every feature's integration test suite extends this instead of each
@@ -39,6 +45,35 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * concurrency test (points-award races, M5) needs two connections actually
  * racing, which a single wrapping transaction would prevent — that test
  * will override this at the class level rather than extend it as-is.
+ * ProblemProgressConcurrencyTest and LeaderboardIntegrationTest (M6) both
+ * take that same exception, for two different reasons — see each class's
+ * own header comment.
+ *
+ * <p>REDIS is the same idea as POSTGRES, one container shared for the
+ * whole test JVM run, added in M6 for `leaderboard.LeaderboardService`.
+ * No dedicated Testcontainers Redis module exists (verified against
+ * testcontainers-bom 2.0.5's own managed dependency list — Postgres,
+ * Kafka, Mongo, ... but no `testcontainers-redis`), so this is a plain
+ * `GenericContainer` instead of a typed one like `PostgreSQLContainer` —
+ * Spring Boot's own `RedisContainerConnectionDetailsFactory` still
+ * recognizes it and wires `spring.data.redis.*` automatically via
+ * `@ServiceConnection`, the same as POSTGRES.
+ *
+ * <p>Through M7, most test classes never actually touched this container
+ * at all (an `@TransactionalEventListener(phase = AFTER_COMMIT)` never
+ * fires under this class's default rollback-per-test wrapping — see
+ * LeaderboardIntegrationTest's own header). M8 changed that:
+ * `scenario.ScenarioService`'s new `@Cacheable` reads write real,
+ * NOT-rolled-back entries into Redis from basically any test that calls
+ * `GET /scenarios`/`GET /scenarios/{id}` — Redis isn't a JPA resource, so
+ * `@Transactional`'s rollback has no effect on it, the same fact
+ * `LeaderboardIntegrationTest`'s own override exists to work around, just
+ * showing up here as an IMPLICIT side effect of an ordinary read instead
+ * of an explicit write this time. Left uncleared, a scenario cached by one
+ * test method (possibly reflecting data that method's own transaction
+ * then rolls back) would leak into every later test in this JVM run.
+ * {@link #clearCaches()} below closes that gap for every test class that
+ * extends this one, not just the ones that know to think about it.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -50,4 +85,23 @@ public abstract class AbstractIntegrationTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @Container
+    @ServiceConnection
+    static final GenericContainer<?> REDIS =
+            new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+
+    @Autowired
+    private CacheManager cacheManager;
+
+    /** Runs after every test method (see class Javadoc) — every registered Spring Cache, cleared, so nothing a test cached (possibly reflecting data its own transaction then rolls back) survives into the next test. */
+    @AfterEach
+    void clearCaches() {
+        for (String name : cacheManager.getCacheNames()) {
+            Cache cache = cacheManager.getCache(name);
+            if (cache != null) {
+                cache.clear();
+            }
+        }
+    }
 }

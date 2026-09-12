@@ -10,8 +10,10 @@ import com.engineeringstudio.api.scenario.Scenario;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,14 +29,17 @@ public class ProblemProgressService {
     private final ProblemProgressRepository problemProgressRepository;
     private final PointsLedgerRepository pointsLedgerRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ProblemProgressService(
             ProblemProgressRepository problemProgressRepository,
             PointsLedgerRepository pointsLedgerRepository,
-            Clock clock) {
+            Clock clock,
+            ApplicationEventPublisher eventPublisher) {
         this.problemProgressRepository = problemProgressRepository;
         this.pointsLedgerRepository = pointsLedgerRepository;
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -71,6 +76,13 @@ public class ProblemProgressService {
             progress.setFirstSolvedAt(now);
         }
 
+        // Unconditional on mode/upgrade, unlike ProblemProgressUpgradedEvent
+        // below — dailychallenge.DailyChallengeService (Phase 7) decides
+        // for itself whether this solve matters (was it TODAY's challenge
+        // scenario?), same one-directional dependency shape as leaderboard.
+        eventPublisher.publishEvent(
+                new ScenarioSolvedEvent(userId, scenarioId, attempt.getId(), attempt.getMode(), LocalDate.now(clock)));
+
         if (attempt.getMode() != AttemptMode.TIMED) {
             // NO_PRESSURE: marks solved, contributes zero points, never
             // upgrades best_* — see phase-3's mode design and
@@ -104,6 +116,15 @@ public class ProblemProgressService {
                     .deltaPoints(delta)
                     .runningTotalForScenario(candidatePoints)
                     .build());
+
+            // Deferred to AFTER_COMMIT by the listener side (see
+            // leaderboard.LeaderboardService) — publishing here, inside
+            // this still-open transaction, only queues the event; nothing
+            // touches Redis until this transaction (recordOutcome's own,
+            // joined into AttemptFinalizer.finalizeVerified's) actually
+            // commits. See decisions.md for why this can't just update
+            // Redis inline right here.
+            eventPublisher.publishEvent(new ProblemProgressUpgradedEvent(userId));
         } else {
             // Re-solved at equal-or-worse quality: no upgrade, no new
             // points, no ledger entry — see masterdoc points formula

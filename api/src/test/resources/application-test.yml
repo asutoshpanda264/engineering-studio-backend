@@ -1,0 +1,19 @@
+# Overlays application.yml for the "test" profile (@ActiveProfiles("test")
+# in AbstractIntegrationTest) — only what genuinely needs a different value
+# under the test harness, everything else inherits the real default.
+
+app:
+  rate-limit:
+    # Generous test-profile ceiling, not the production value. Every
+    # existing integration test's registerAs() helper calls
+    # POST /auth/login for real, via MockMvc, from the same fixed
+    # 127.0.0.1 remote address — a test class with several @Test methods
+    # (LeaderboardIntegrationTest, DailyChallengeIntegrationTest, ...)
+    # legitimately calls it far more than the production limit (10/min)
+    # within a single real minute of wall-clock test time. Kept high
+    # enough here that no ordinary test trips it; RateLimitIntegrationTest
+    # is the one place that deliberately overrides back down to a small
+    # number, via @TestPropertySource, to actually exercise the 429 path —
+    # see phase-8-caching-and-rate-limiting/decisions.md.
+    auth-requests-per-minute: 10000
+    submit-requests-per-minute: 10000

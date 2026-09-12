@@ -11,6 +11,7 @@ import com.engineeringstudio.api.auth.Role;
 import com.engineeringstudio.api.auth.User;
 import com.engineeringstudio.api.auth.UserRepository;
 import com.engineeringstudio.api.common.json.JsonUtil;
+import com.engineeringstudio.api.leaderboard.LeaderboardType;
 import com.engineeringstudio.api.points.PointsCalculator;
 import com.engineeringstudio.api.points.PointsLedgerEntry;
 import com.engineeringstudio.api.points.PointsLedgerRepository;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -58,7 +60,11 @@ import org.springframework.transaction.annotation.Transactional;
  * transaction. This is exactly the exception AbstractIntegrationTest's
  * own class-level Javadoc already anticipated. Because nothing here
  * auto-rolls-back, every row created is deleted explicitly in
- * {@link #cleanUp()}.
+ * {@link #cleanUp()} — as of Phase 6, that now includes the winning
+ * racer's Redis leaderboard membership too: a real commit here is exactly
+ * what {@code LeaderboardService}'s {@code AFTER_COMMIT} listener fires
+ * on (see leaderboard.decisions.md #3), so this test has real Redis side
+ * effects now, not just Postgres ones.
  */
 @Import(TestServiceOverridesConfig.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -97,6 +103,9 @@ class ProblemProgressConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
     private UUID userId;
 
     @BeforeEach
@@ -133,7 +142,12 @@ class ProblemProgressConcurrencyTest extends AbstractIntegrationTest {
     @AfterEach
     void cleanUp() {
         // No transactional rollback here (see class Javadoc) — every row
-        // this test created is deleted explicitly, children before parents.
+        // (and, as of Phase 6, every Redis leaderboard member) this test
+        // created is deleted explicitly, children before parents.
+        String member = userId.toString();
+        for (LeaderboardType type : LeaderboardType.values()) {
+            redisTemplate.opsForZSet().remove(type.redisKey(), member);
+        }
         pointsLedgerRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .forEach(pointsLedgerRepository::delete);
         problemProgressRepository.findByUserId(userId).forEach(problemProgressRepository::delete);

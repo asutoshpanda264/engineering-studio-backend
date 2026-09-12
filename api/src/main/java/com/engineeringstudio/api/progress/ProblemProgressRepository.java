@@ -62,4 +62,31 @@ public interface ProblemProgressRepository extends JpaRepository<ProblemProgress
     Optional<ProblemProgress> findByUserIdAndScenarioId(UUID userId, String scenarioId);
 
     List<ProblemProgress> findByUserId(UUID userId);
+
+    /**
+     * The single source-of-truth aggregate leaderboard.LeaderboardService
+     * recomputes from, on every refresh — see decisions.md's "recompute
+     * and SET, never increment" entry. Filtered on
+     * {@code bestSpeedFactor IS NOT NULL} rather than
+     * {@code status = SOLVED} deliberately: that field is set on ONLY the
+     * TIMED, delta&gt;0 branch of recordOutcome, so this one condition
+     * already excludes NO_PRESSURE solves — which AttemptMode's own
+     * Javadoc says must be "excluded from every leaderboard" — without a
+     * separate mode check here. SQL's AVG ignores NULLs on its own, so
+     * every row this WHERE clause admits has a real speed factor to
+     * average; a user with zero qualifying rows gets an aggregate with
+     * {@code solvedCount = 0} and a null {@code avgSpeedFactor}.
+     */
+    @Query("""
+            SELECT COUNT(p) AS solvedCount,
+                   COALESCE(SUM(p.bestPoints), 0L) AS totalPoints,
+                   AVG(p.bestSpeedFactor) AS avgSpeedFactor
+            FROM ProblemProgress p
+            WHERE p.userId = :userId AND p.bestSpeedFactor IS NOT NULL
+            """)
+    ProblemProgressLeaderboardStats aggregateLeaderboardStats(@Param("userId") UUID userId);
+
+    /** Every user who has ever earned a leaderboard-eligible solve — the full membership list leaderboard.LeaderboardService.rebuildAll() replays. */
+    @Query("SELECT DISTINCT p.userId FROM ProblemProgress p WHERE p.bestSpeedFactor IS NOT NULL")
+    List<UUID> findDistinctUserIdsWithLeaderboardEligibleSolves();
 }

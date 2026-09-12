@@ -29,6 +29,27 @@ spring:
       hibernate:
         format_sql: true
 
+  data:
+    redis:
+      # Not the source of truth for anything — leaderboard.LeaderboardService
+      # treats this connection purely as a rebuildable projection of
+      # problem_progress. Same env-override pattern as `datasource` above.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  cache:
+    # Auto-configures a RedisCacheManager over the SAME Redis connection
+    # above — explicit rather than left to auto-detection, same "say what
+    # you mean" preference as every other infra choice in this file.
+    type: redis
+    redis:
+      # Safety-net TTL, not the primary consistency mechanism —
+      # ScenarioService evicts explicitly on every mutation (publish,
+      # archive, update). This just bounds the damage of a missed eviction
+      # to 10 minutes instead of forever. See
+      # phase-8-caching-and-rate-limiting/decisions.md.
+      time-to-live: 10m
+
   flyway:
     enabled: true
     # Flyway's own `${placeholder}` templating is unrelated to Postgres's
@@ -54,6 +75,19 @@ app:
   verify-service:
     base-url: ${VERIFY_SERVICE_URL:http://localhost:4000}
     timeout-seconds: 10
+  rate-limit:
+    # Fixed 1-minute windows — see common.ratelimit.RateLimitFilter.
+    # Generous enough not to interfere with legitimate use (a student
+    # iterating quickly, a normal login/register flow), tight enough to
+    # blunt brute-force/credential-stuffing and submit-spam.
+    auth-requests-per-minute: 10
+    submit-requests-per-minute: 20
+  cors:
+    # A single scalar env value binds fine to List<String> here (Spring
+    # Boot's relaxed binding splits on commas) — CORS_ALLOWED_ORIGINS=
+    # "https://foo.com,https://bar.com" works for a real multi-origin
+    # deploy without any code change.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 server:
   port: ${PORT:8080}

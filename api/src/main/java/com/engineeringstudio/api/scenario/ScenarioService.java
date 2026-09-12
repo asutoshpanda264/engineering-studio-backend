@@ -8,13 +8,33 @@ import com.engineeringstudio.api.scenario.dto.ScenarioResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 
+/**
+ * Phase 8 added Redis-backed caching to the two PUBLIC read paths only
+ * ({@link #listPublished} and {@link #getPublished}) — see
+ * phase-8-caching-and-rate-limiting/decisions.md for why those two and not
+ * `listDrafts`/`getVersion` (low-traffic, freshness-sensitive for editors).
+ * `PUBLISHED_LIST_CACHE` holds one entry (there's no per-request key — the
+ * whole published list is one cached value); `PUBLISHED_SCENARIO_CACHE` is
+ * keyed by scenario id. Every mutation that could change what either cache
+ * holds evicts both, explicitly, in the same method — see each method's
+ * own `@Caching`/`@CacheEvict`. `delete` is the one mutation that
+ * deliberately evicts nothing: it only ever succeeds on a DRAFT scenario
+ * (see its own check below), and a DRAFT was never in either published
+ * cache to begin with.
+ */
 @Service
 public class ScenarioService {
+
+    static final String PUBLISHED_LIST_CACHE = "scenarios-published-list";
+    static final String PUBLISHED_SCENARIO_CACHE = "scenarios-published";
 
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {
     };
@@ -53,6 +73,19 @@ public class ScenarioService {
      * always holds the latest. See masterdoc phase-2 decisions.md for why
      * this ordering matters for an Attempt's fairness guarantee.
      */
+    /**
+     * Evicts both scenario caches even though most updates target a
+     * DRAFT (never cached) — an ADMIN can edit an already-PUBLISHED
+     * scenario too (see assertCanEdit below), and there's no cheap way to
+     * tell which case this is before the write happens. Evicting
+     * unconditionally is a no-op cache miss for the (more common)
+     * draft-edit case, and correct invalidation for the less common
+     * published-edit case.
+     */
+    @Caching(evict = {
+            @CacheEvict(cacheNames = PUBLISHED_SCENARIO_CACHE, key = "#id"),
+            @CacheEvict(cacheNames = PUBLISHED_LIST_CACHE, allEntries = true)
+    })
     @Transactional
     public ScenarioResponse update(String id, ScenarioRequest request, UUID actorId, Role actorRole) {
         if (!id.equals(request.id())) {
@@ -85,6 +118,11 @@ public class ScenarioService {
         }
     }
 
+    /** Moves DRAFT -> PUBLISHED, so the published list is now genuinely different — evict it entirely, not just this one id. */
+    @Caching(evict = {
+            @CacheEvict(cacheNames = PUBLISHED_SCENARIO_CACHE, key = "#id"),
+            @CacheEvict(cacheNames = PUBLISHED_LIST_CACHE, allEntries = true)
+    })
     @Transactional
     public ScenarioResponse publish(String id) {
         Scenario scenario = getOrThrow(id);
@@ -95,6 +133,11 @@ public class ScenarioService {
         return mapper.toResponse(scenarioRepository.save(scenario));
     }
 
+    /** Moves PUBLISHED -> ARCHIVED — same reasoning as publish() above, just the reverse transition. */
+    @Caching(evict = {
+            @CacheEvict(cacheNames = PUBLISHED_SCENARIO_CACHE, key = "#id"),
+            @CacheEvict(cacheNames = PUBLISHED_LIST_CACHE, allEntries = true)
+    })
     @Transactional
     public ScenarioResponse archive(String id) {
         Scenario scenario = getOrThrow(id);
@@ -105,6 +148,10 @@ public class ScenarioService {
         return mapper.toResponse(scenarioRepository.save(scenario));
     }
 
+    // Deliberately no @CacheEvict here — the check below means this only
+    // ever succeeds on a DRAFT scenario, which was never in
+    // PUBLISHED_SCENARIO_CACHE or PUBLISHED_LIST_CACHE to begin with. See
+    // this class's own Javadoc.
     @Transactional
     public void delete(String id) {
         Scenario scenario = getOrThrow(id);
@@ -115,6 +162,7 @@ public class ScenarioService {
         scenarioRepository.delete(scenario);
     }
 
+    @Cacheable(PUBLISHED_LIST_CACHE)
     @Transactional(readOnly = true)
     public List<ScenarioResponse> listPublished() {
         return scenarioRepository.findByStatus(ScenarioStatus.PUBLISHED).stream()
@@ -122,7 +170,8 @@ public class ScenarioService {
                 .toList();
     }
 
-    /** Published-only — a draft/archived id 404s here even if it exists, so the public endpoint never leaks unpublished content. */
+    /** Published-only — a draft/archived id 404s here even if it exists, so the public endpoint never leaks unpublished content. Not cached on a miss/404 — @Cacheable never caches a thrown exception, so a not-yet-published id is simply re-checked every time, which is what we want (it might get published later). */
+    @Cacheable(cacheNames = PUBLISHED_SCENARIO_CACHE, key = "#id")
     @Transactional(readOnly = true)
     public ScenarioResponse getPublished(String id) {
         Scenario scenario = getOrThrow(id);
