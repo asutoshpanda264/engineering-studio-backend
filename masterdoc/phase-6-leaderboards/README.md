@@ -52,6 +52,11 @@ No new Flyway migration — this phase reads only from `problem_progress`
   the full write path from a submit to Redis actually changing (with the
   AFTER_COMMIT timing spelled out step by step), why recomputing beats
   incrementing, and how the read/rebuild endpoints work.
+- `industry.md` — how real-world systems solve the same problems this
+  phase did (leaderboard storage/update strategy, cache-consistency
+  ordering, domain events for decoupling, cross-task score
+  normalization, rebuild-from-source), and how this project's approach
+  compares.
 
 ## Test status
 

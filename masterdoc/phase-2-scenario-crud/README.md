@@ -42,6 +42,9 @@ failures, not planned upfront).
   32-scenario migration story including a real Flyway/JSON collision bug.
 - `explain_scenario.md` — the state machine, versioning mechanics, JSONB
   boundary, and how the seed migration works.
+- `industry.md` — how real-world systems solve the same problems (JSONB
+  storage, content versioning, publish workflows, soft delete, seed data),
+  and how this project's approach compares
 
 ## Test status
 

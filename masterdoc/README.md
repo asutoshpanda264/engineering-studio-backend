@@ -18,9 +18,11 @@ repo, not two.
 
 Each phase folder holds what's specific to that milestone only: its own
 `README.md` (what shipped + test status), `decisions.md` (why its
-phase-specific choices were made), and one or more `explain_<topic>.md`
-files (how its modules actually work). Created when that phase's work
-starts, not pre-scaffolded ahead of time.
+phase-specific choices were made), one or more `explain_<topic>.md`
+files (how its modules actually work), and `industry.md` (how real-world
+systems solve the same problems this phase did, and how/why this
+project's own approach compares — pros, cons, and trade-offs both ways).
+Created when that phase's work starts, not pre-scaffolded ahead of time.
 
 | # | Phase | Status | Folder |
 |---|---|---|---|
@@ -42,7 +44,7 @@ Phase 8 gave the frontend something real to connect to:**
 
 | Phase | Status | Folder |
 |---|---|---|
-| Frontend Integration — connecting `engineering_studio` (sibling repo) to this backend | ✅ Increments 1-5 done (auth foundation + Timed Challenge attempt/submit + leaderboard/daily-challenge pages + Workshop header signed-in indicator + NO_PRESSURE/free-play wiring) | `phase-frontend-integration/` |
+| Frontend Integration — connecting `engineering_studio` (sibling repo) to this backend | ✅ Increments 1-6 done (auth foundation + Timed Challenge attempt/submit + leaderboard/daily-challenge pages + Workshop header signed-in indicator + NO_PRESSURE/free-play wiring + progress history page) — fully caught up to what the backend exposes | `phase-frontend-integration/` |
 
 Milestone 9 is deliberately on hold until this is done.
 
@@ -159,3 +161,14 @@ Milestone 9 is deliberately on hold until this is done.
   `ScenarioDeepLink`'s mount effect and auth bootstrap's `/me` call,
   found during Increment 5's live testing and fixed there (affected both
   modes, not something Increment 5 introduced).
+- *"Where can a student see every scenario they've ever solved, server-side —
+  and why does a solved row sometimes show 0 points/stars?"* →
+  `phase-frontend-integration/decisions.md` #21-23 — `/progress`
+  (Increment 6), signed-in-only (no guest variant exists on the
+  backend), and #22 specifically for why a NO_PRESSURE-only solve
+  legitimately shows `—` rather than a broken-looking `0`.
+- *"How does what we built here compare to how real companies/products
+  solve the same problem?"* → every phase folder's own `industry.md`
+  (all 9, including `phase-frontend-integration/`) — per-mechanism
+  industry comparisons with named real systems, and the honest
+  trade-offs of this project's simpler approach vs. theirs.

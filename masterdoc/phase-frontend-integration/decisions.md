@@ -496,3 +496,67 @@ on its own.
   the same URL — zero new `/attempts` requests fired, exactly the
   existing local-only behavior.
 - Zero console errors across the whole pass, both pre- and post-fix.
+
+---
+
+## Increment 6 — Progress history page
+
+### 21. Signed-in-only throughout — no "guest-visible, auth-gated-extra" split like Increments 3's leaderboard/daily-challenge pages
+
+- **Chose:** `/progress` shows a "Sign in to see your solved scenarios,
+  points, and stars" prompt for guests, with no fetch attempted at all,
+  rather than trying to render anything for a signed-out visitor.
+- **Why this is NOT the same shape as decisions.md #14:**
+  `GET /progress/scenarios` has no public/guest variant on the backend —
+  `ProblemProgressController` takes `Authentication authentication` as a
+  required parameter with no carve-out in `SecurityConfig` (unlike
+  `/leaderboards/**` and `/daily-challenge/**`, both explicitly
+  `permitAll()`'d). There's also no sensible guest-facing content this
+  page COULD show even if the endpoint were public — "every scenario
+  the SERVER has a real attempt for" is inherently about a specific
+  signed-in identity, not a public ranking or a shared daily pick. A
+  guest already has `/problems`' own local (`localStorage`) progress
+  badges for the "what have I solved" question, without needing an
+  account — this page is additive on top of that, not a replacement.
+- **Considered:** faking a "public" empty state that still calls the
+  endpoint and silently swallows the resulting 401. Rejected — an
+  unauthenticated request that both parties already know will fail is
+  pointless network traffic, not a legitimate guest experience.
+
+### 22. Points/stars can legitimately read `—` on a `SOLVED` row — not a bug, the NO_PRESSURE case surfacing correctly
+
+- **What this is:** `ProblemProgressService.recordOutcome` (Phase 5)
+  marks a scenario `SOLVED` on ANY passing submit regardless of mode,
+  but only a TIMED submit ever upgrades `bestStars`/`bestPoints`/
+  `bestComposite`/`bestSpeedFactor` — a NO_PRESSURE-only solve leaves
+  those at their defaults (0/0/null/null). Since Increment 5 wired free
+  play into the backend, this is now a real, reachable case, not just a
+  theoretical one.
+- **Chose:** render `0` stars/points as `—` (an explicit dash), not a
+  bare `0` — a `0` next to a green "Solved" badge reads as if something
+  went wrong (partial credit? a scoring bug?); a dash reads as "this
+  dimension doesn't apply here," which is the actual truth. The page's
+  own subtitle also states this rule directly ("points and stars only
+  count a Timed Challenge submission") so a first-time reader isn't left
+  to infer it from the dash alone.
+- **Verified against this exact case, not a hypothetical:** the live
+  test account's own row (`price-alert-notifications`, solved via free
+  play in Increment 5's testing) rendered exactly this way — confirmed
+  during this increment's live pass, not assumed from reading the
+  backend code alone.
+
+### 23. Reuses `@/scenarios`' `getScenario()` for title/difficulty — no new backend field, no denormalization
+
+- **Chose:** `ProblemProgressResponse` carries only `scenarioId`; the
+  frontend resolves title/difficulty locally via `getScenario(id)`, the
+  same lookup `/leaderboard`'s `MyLeaderboardStandingResponse` handling
+  and `/daily-challenge`'s `DailyChallengeResponse` (which DOES carry a
+  denormalized `scenarioTitle`) both already established as options.
+- **Why the leaderboard-style lookup, not the daily-challenge-style
+  denormalized field:** a daily challenge is exactly one scenario at a
+  time, worth denormalizing for that endpoint's own simplicity; this
+  page renders a whole LIST of scenario ids at once, all of which
+  already exist in the frontend's own `src/scenarios/` catalogue — no
+  new backend field or migration needed, and title/difficulty can never
+  drift from what the frontend already shows everywhere else (`/problems`,
+  the Workshop's own scenario briefing).

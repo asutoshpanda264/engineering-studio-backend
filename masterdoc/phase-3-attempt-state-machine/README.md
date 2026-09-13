@@ -37,6 +37,11 @@ daily-challenge boundaries).
   scope cut (no duplicate-concurrent-attempt guard).
 - `explain_attempt.md` — the state machine diagram, the elapsed-time
   calculation in full, and what "submit" actually does step by step.
+- `industry.md` — how real-world systems solve the same problems (server-
+  authoritative timing, state machines, the stub-then-real-integration
+  seam, split transaction boundaries, resubmittable failures, and the
+  missing concurrent-attempt guard) and how this project's approach
+  compares.
 
 ## Test status
 

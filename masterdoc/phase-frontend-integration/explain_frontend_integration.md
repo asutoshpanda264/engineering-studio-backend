@@ -326,3 +326,44 @@ both boards. The race-condition fix verified both ways: reproduced (zero
 `POST /attempts`) before the fix, confirmed fixed (a real 201) after it,
 on the identical hard-navigation test. Guest behavior unchanged. Zero
 console errors throughout.
+
+## Increment 6 — the progress history page's read path
+
+Simplest of the integration pages so far — one endpoint, one signed-in
+gate, no branching on guest-vs-signed-in content since none exists for
+guests here:
+
+```
+/progress (src/app/progress/page.tsx)
+  │  authStatus !== "ready" → render nothing (avoids a guest-prompt
+  │                            flash for an already-signed-in student
+  │                            whose bootstrap hasn't resolved yet)
+  │  !user → "Sign in to see your solved scenarios..." prompt, no fetch
+  ▼
+getMyProgress()                         (src/lib/api/progress.ts)
+  │  → authenticatedRequest — no guest path exists on the backend at all
+  ▼
+GET /progress/scenarios  →  ProblemProgressResponse[]  (Phase 5)
+  │  each row: scenarioId, status (ATTEMPTED|SOLVED), bestStars,
+  │  bestPoints, bestComposite, bestSpeedFactor, firstSolvedAt,
+  │  lastAttemptAt
+  ▼
+sorted by lastAttemptAt desc; each row's title/difficulty resolved
+locally via getScenario(scenarioId) — no new backend field, see
+decisions.md #23
+```
+
+See decisions.md #21 for why this page is signed-in-only throughout
+(unlike leaderboard/daily-challenge's guest-visible split), and #22 for
+why a `SOLVED` row can legitimately show `—` for stars/points (a
+NO_PRESSURE-only solve, now reachable since Increment 5).
+
+## Verified live — Increment 6
+
+Guest: the sign-in prompt rendered with zero network calls attempted.
+Signed in: a real `GET /progress/scenarios` (200) returned the
+free-play solve from Increment 5's own test account, rendering as "1
+solved · 1 attempted · 0 points" with `—` for stars/points exactly as
+decisions.md #22 anticipated — confirmed live, not assumed. The
+scenario title's link resolved to the correct `/workshop?scenario=...`
+href. No console errors.

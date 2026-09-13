@@ -54,6 +54,11 @@ product behavior (see decisions.md #3).
   flow, the full write path from a submit to a streak actually updating
   (step by step, contrasted directly with Phase 6's), and why NO_PRESSURE
   affects one but not the other.
+- `industry.md` — how real-world systems solve the same problems (daily-item
+  assignment strategy vs. Wordle's deterministic pick, Duolingo/GitHub-style
+  streak counting, idempotent completion recording, precise domain events,
+  same-transaction vs. after-commit consistency, and the Hibernate
+  identity-map staleness bug) and how this project's approach compares.
 
 ## Test status
 

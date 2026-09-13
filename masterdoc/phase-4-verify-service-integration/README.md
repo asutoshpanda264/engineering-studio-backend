@@ -37,6 +37,10 @@ shape mismatch that silently zeroed out cost calculations).
   graph needs two different adapted shapes, and why the vendored files
   work unmodified despite referencing a path (`@/store/workshopStore`)
   that doesn't exist in this repo.
+- `industry.md` — how real-world systems solve the same problems this
+  phase did (vendoring, stateless scoring services, golden/contract
+  testing, test-double scoping, layered verification, monorepo vs
+  polyrepo), and how this project's approach compares.
 
 ## Test status
 

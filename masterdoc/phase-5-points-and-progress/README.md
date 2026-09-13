@@ -42,6 +42,10 @@ own test suite — see `decisions.md` #5.
 - `explain_points.md` — the formula spelled out with intuition, the full
   step-by-step recording flow, and why there are two differently-locked
   ways to read a `ProblemProgress` row.
+- `industry.md` — how real-world systems solve the same problems (pure
+  scoring functions, concurrent read-modify-write, append-only ledgers,
+  transactional coupling, deterministic concurrency testing), and how this
+  project's approach compares
 
 ## Test status
 

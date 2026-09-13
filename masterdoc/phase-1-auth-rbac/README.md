@@ -26,6 +26,9 @@ end by an RBAC smoke-test endpoint (`GET /admin/ping`).
 - `explain_auth.md` — how the whole login/token/RBAC flow actually works
 - `explain_boot4-migration.md` — three Spring Boot 4 package-relocation
   gotchas hit while building this, and the technique for finding any more
+- `industry.md` — how real-world systems solve the same problems (token
+  strategy, RBAC, password storage, etc.), and how this project's approach
+  compares
 
 ## Test status
 

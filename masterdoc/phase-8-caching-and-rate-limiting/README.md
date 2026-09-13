@@ -60,6 +60,10 @@ Java config.
   exact eviction rule, the rate limiter's Redis mechanics table (which
   request maps to which key/limit), and why the "test" Spring profile
   runs with rate limiting effectively off (with one deliberate exception).
+- `industry.md` — how real-world systems solve the same problems (cache
+  invalidation, rate-limiting algorithms, endpoint-targeted limits,
+  shared infrastructure reuse, cache serialization), and how this
+  project's approach compares
 
 ## Test status
 

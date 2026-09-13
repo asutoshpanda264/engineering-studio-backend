@@ -1,6 +1,6 @@
 # Frontend Integration — connecting `engineering_studio` to this backend
 
-**Status:** ✅ Increments 1-5 done, verified live. Not one of the numbered 1-9 milestones from the
+**Status:** ✅ Increments 1-6 done, verified live. Not one of the numbered 1-9 milestones from the
 approved build plan (`/home/asutosh/.claude/plans/lets-dicuss-more-what-zany-swing.md`)
 — a separate initiative, started once Phases 1-8 gave the frontend a real
 API surface to connect to. Milestone 9 (AI assistant seam) is explicitly
@@ -56,8 +56,16 @@ experience keeps working exactly as before for anyone who doesn't log in.
   introduced by this increment) where a hard page load could silently
   skip creating any backend attempt at all for a genuinely signed-in
   student. See decisions.md #18-20.
-- **Not yet done:** a progress-history page beyond the daily-challenge
-  history list built in Increment 3.
+- **Increment 6 — Progress history page** ✅ done. `/progress` reads
+  the Phase 5 `GET /progress/scenarios` endpoint (self-only,
+  authenticated-only — no public/guest variant, unlike leaderboards/daily
+  challenge) — every scenario the server has a real attempt for, with
+  status, best stars/points, and last-attempt date, distinct from
+  `/problems`' own local (`localStorage`) per-scenario badges. See
+  decisions.md #21.
+- **Not yet done, still open:** nothing else from this file's original
+  scope — Milestone 9 (AI assistant seam) is the only remaining item,
+  deliberately on hold per the user's own standing instruction.
 
 ## Files touched
 
@@ -131,6 +139,16 @@ experience keeps working exactly as before for anyone who doesn't log in.
   `useAuth().status` to settle before loading a scenario/starting a
   challenge — a real race-condition fix, not just free-play wiring; see
   decisions.md #19 — Increment 5
+- `src/lib/api/types.ts` (extended) — `ProblemProgressStatus`,
+  `ProblemProgressResponse` — Increment 6
+- `src/lib/api/progress.ts` (new) — `getMyProgress()` — Increment 6
+- `src/app/progress/page.tsx` (new) — signed-in-only "My Progress" page:
+  a summary strip (solved/attempted/points) plus a per-scenario table
+  (status, stars, points, last attempt), each row linking back into the
+  Workshop — Increment 6
+- `src/app/problems/page.tsx` (edited) — added a "Progress" link to the
+  `AppHeader` right slot, same pattern as Leaderboard/Daily/Interviews —
+  Increment 6
 
 ## Docs in this folder
 
@@ -139,6 +157,11 @@ experience keeps working exactly as before for anyone who doesn't log in.
 - `explain_frontend_integration.md` — how the two apps actually talk to
   each other: the request path, the auth store's shape, the
   guest-vs-signed-in split.
+- `industry.md` — how real-world systems solve the same problems
+  (access/refresh token refresh, header-token vs. cookie auth, guest-first
+  product design, `useSyncExternalStore`-based stores, async auth
+  hydration races, and bounded vs. unbounded attempt lifecycles) and how
+  this project's approach compares.
 
 ## Test status
 
@@ -190,3 +213,12 @@ experience keeps working exactly as before for anyone who doesn't log in.
   confirmed gone after it, on the identical hard-navigation test. Guest
   behavior (signed out, same URL) still fired zero `/attempts` calls. No
   console errors throughout.
+- Increment 6, verified live: `/progress` as a guest correctly shows a
+  "Sign in to see your solved scenarios..." prompt (no fetch attempted,
+  matching the backend's own no-guest-variant reality). Signed in, a
+  real `GET /progress/scenarios` (200) returned the free-play solve from
+  Increment 5's own testing — rendered as "1 solved · 1 attempted · 0
+  points" with a `SOLVED` badge and `—` for stars/points (the NO_PRESSURE
+  zero-points case, confirmed to render as an intentional dash, not a
+  broken-looking blank). The scenario title's link resolved to the exact
+  expected `/workshop?scenario=...` href. No console errors.
