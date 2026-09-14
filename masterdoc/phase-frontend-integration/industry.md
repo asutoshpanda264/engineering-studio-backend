@@ -24,18 +24,20 @@ retried again. See `decisions.md` #3.
 refresh-token shape (RFC 6749) — a short-lived access token limits the
 damage window if it leaks, and a longer-lived refresh token (itself
 revocable server-side) is exchanged for a new one without re-prompting for
-credentials. Auth0's and Okta's own public documentation describe the same
-"intercept a 401, refresh once, retry once" pattern client SDKs implement,
-and it's the same shape `axios`-interceptor or Apollo-Client
-`errorLink`-based refresh recipes commonly used in SPAs implement — a
-single-flight refresh, not per-caller retry logic duplicated everywhere.
+credentials. "Intercept a 401, refresh once, retry once" is a commonly
+published recipe for exactly this shape — `axios`-interceptor and
+Apollo-Client `errorLink`-based refresh examples implementing it are
+widely circulated in SPA tooling documentation and community writeups —
+built around a single-flight refresh rather than per-caller retry logic
+duplicated everywhere.
 
 **Why this project differs (or doesn't)**: it doesn't differ — this is the
 textbook version of the pattern, deliberately centralized: `decisions.md`
-#3 states the reasoning industry SDKs give for the "exactly once" rule
-directly — a second 401 right after a successful refresh means the refresh
-token itself is dead, and retrying further would either loop forever or
-present a hang instead of a clear logged-out state.
+#3 gives this project's own reasoning for the "exactly once" rule, which
+matches the same logic these published recipes use — a second 401 right
+after a successful refresh means the refresh token itself is dead, and
+retrying further would either loop forever or present a hang instead of a
+clear logged-out state.
 
 **Trade-offs**:
 - Gives up: no refresh-request de-duplication for multiple concurrent 401s

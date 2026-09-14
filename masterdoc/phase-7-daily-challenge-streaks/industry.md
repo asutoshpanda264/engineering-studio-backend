@@ -77,7 +77,11 @@ yesterday; otherwise it resets to 1. `longestStreak` tracks the running
 maximum. All three fields (`currentStreak`, `longestStreak`,
 `lastSolveDate`) live directly on `User`, computed from the server's own
 `Clock`-derived date, not anything client-supplied. See
-`explain_dailychallenge.md`'s "write path" section and `decisions.md` #8.
+`explain_dailychallenge.md`'s "write path" section for the algorithm
+itself — there's no dedicated `decisions.md` entry for the
+streak-counting logic specifically (`decisions.md` #8 covers a related
+but different choice: exposing these fields via `GET /me` rather than a
+new endpoint, once the algorithm already existed).
 
 **Industry approaches**: this is the same core algorithm behind the
 best-known consumer streak features. Duolingo's streak counter (widely
@@ -85,9 +89,15 @@ discussed in its own product documentation and support articles) works on
 the identical "did you engage since your last calendar day, or did the
 streak break" logic, with its well-documented "streak freeze" feature as an
 explicit, deliberate exception layered on top of the same base rule.
-GitHub's contribution-streak display on a user's profile follows the same
-consecutive-calendar-day counting shape. Snapchat's "Snapstreak" is the
-same pattern applied to a pairwise (two-user) activity instead of a single
+GitHub's own profile page doesn't natively display a streak counter —
+but a whole ecosystem of popular third-party tools (e.g.
+`github-readme-streak-stats`, widely embedded in README profiles) computes
+one from GitHub's public contribution-graph data using this exact
+consecutive-calendar-day counting shape, which is telling on its own:
+the underlying data (a calendar of daily activity) is common enough that
+the same streak algorithm gets bolted on by the community even where the
+platform itself never built it. Snapchat's "Snapstreak" is the same
+pattern applied to a pairwise (two-user) activity instead of a single
 user's own history.
 
 **Why this project differs (or doesn't)**: it's the same algorithm at its
@@ -287,9 +297,13 @@ can't be satisfied from cache regardless. See `decisions.md` #6.
 **Industry approaches**: this exact failure mode — an ORM's identity map
 returning a stale object after a bypass write — is a widely-documented
 pitfall across ORMs, not specific to Hibernate. Hibernate's own reference
-documentation describes `@Modifying(clearAutomatically = true)` (Spring
-Data JPA) and manual `EntityManager.clear()`/`refresh()` calls specifically
-for this scenario. Rails' ActiveRecord has the identical documented gotcha
+documentation covers the underlying cause (the first-level cache/session
+not knowing about a change made outside it) and its own generic fixes
+(`EntityManager.clear()`/`refresh()`); `@Modifying(clearAutomatically =
+true)` specifically is Spring Data JPA's own documented convenience
+built on top of that same Hibernate mechanism, for exactly this
+native-bulk-update-then-stale-read scenario. Rails' ActiveRecord has the
+identical documented gotcha
 with raw SQL (`update_all`/`exec_update`) not refreshing already-loaded
 in-memory objects, with `reload` as the standard fix. The general principle
 — any cache sitting in front of a data store needs an explicit
@@ -327,16 +341,19 @@ recording (#3) and precise domain events (#4) are the same patterns Stripe
 and DDD literature describe outright, and the same-transaction-vs-
 after-commit contrast with Phase 6 (#5) is the textbook-correct call in
 both directions, not a corner cut in either one. The one genuinely
-deliberate deviation from a well-known peer product is the streak
-assignment strategy (#1) — choosing real randomness over Wordle's
-deterministic date-to-item mapping — and it's an honest, well-reasoned
+deliberate deviation from a well-known peer product is the daily
+challenge's own assignment strategy (#1) — choosing real randomness over
+Wordle's deterministic date-to-item mapping — and it's an honest,
+well-reasoned
 choice rather than a simplification forced by scale: nothing about this
 project's size makes determinism harder to implement, it just wasn't the
 actual product requirement. The streak algorithm itself (#2) is the same
-math Duolingo and GitHub use, deliberately without the retention-driven
-extras (streak freezes, lapse reminders) those consumer products layer on
-top — a legitimate scope cut for a portfolio project with no retention
-data to act on, not a gap in the core mechanism. Bug #6 is not a design
+consecutive-calendar-day math Duolingo uses (and that third-party tools
+bolt onto GitHub's public contribution data, even though GitHub itself
+doesn't build a streak feature), deliberately without the
+retention-driven extras (streak freezes, lapse reminders) those consumer
+products layer on top — a legitimate scope cut for a portfolio project
+with no retention data to act on, not a gap in the core mechanism. Bug #6 is not a design
 trade-off at all — it is the standard ORM pitfall with the standard fix,
 worth keeping in mind (as `decisions.md` #6 already flags) any time a
 future phase adds another native upsert next to a plain entity read.

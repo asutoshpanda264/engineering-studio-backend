@@ -28,9 +28,11 @@ cached. See `decisions.md` #1, #3, #4, #5.
 
 **Industry approaches**: "invalidate on write, TTL as a backstop" is the
 standard shape of the cache-aside pattern used throughout web backends —
-AWS's own caching documentation (for ElastiCache) describes this exact
-combination: explicit invalidation for correctness, a TTL as insurance
-against a missed invalidation path. CDNs solve the same problem at a
+AWS's own ElastiCache caching-strategy documentation covers both halves
+of this combination (explicit invalidation of a stale entry on write, and
+a TTL/expiration as a general safety net), the same pairing this project
+uses, even though AWS's docs don't frame it in exactly those two words.
+CDNs solve the same problem at a
 different layer with an explicit **purge/invalidate API** — Cloudflare and
 Fastly both let an origin explicitly invalidate a cached URL immediately
 after a content change, rather than waiting out a `Cache-Control` max-age,
@@ -79,16 +81,22 @@ this exact scheme.
 **Industry approaches**: fixed-window counters are one of several
 well-documented rate-limiting algorithms, and the boundary-burst problem
 this project accepts is exactly the reason two alternatives exist and are
-widely used in production: **token bucket** (Stripe's and Amazon API
-Gateway's publicly documented rate-limiting model — a bucket refills
+widely used in production: **token bucket** (a bucket refills
 continuously at a fixed rate and requests consume tokens, with no hard
-window edges to burst across) and **sliding-window log/counter** (weights
-the current and previous window by elapsed time, smoothing the exact
-boundary case fixed-window has). Cloudflare's public rate-limiting
-documentation describes offering a sliding-window approximation for
-exactly this reason. Bucket4j (this project's own `decisions.md` #7 names
-it as the considered alternative) is a widely-used Java library
-implementing token bucket over Redis for exactly this use case.
+window edges to burst across — Amazon API Gateway's own documentation
+names token bucket directly as its throttling model) and
+**sliding-window log/counter** (weights the current and previous window
+by elapsed time, smoothing the exact boundary case fixed-window has).
+Cloudflare's public rate-limiting documentation describes offering a
+sliding-window approximation for exactly this reason. Stripe's own API
+documentation recommends token bucket too, but on the *other* side of
+the relationship — as the algorithm it suggests API *callers* implement
+client-side to self-throttle their own request rate, not as a
+description of Stripe's own server-side enforcement (which Stripe
+doesn't publicly specify the internals of). Bucket4j (this project's
+own `decisions.md` #7 names it as the considered alternative) is a
+widely-used Java library implementing token bucket over Redis for
+exactly this use case.
 
 **Why this project differs (or doesn't)**: a deliberate, explicitly-argued
 trade-off, not an oversight — `decisions.md` #7 states plainly that the
@@ -225,18 +233,27 @@ jar to be the Jackson 3.x variant, not the classic-Jackson-pulling
 app's HTTP layer already uses, so a cache hit's JSON is byte-for-byte
 identical to a live response. See `decisions.md` #11.
 
-**Industry approaches**: JSON as the cache serialization format (rather
-than a JVM-specific binary format like Java serialization) is a common
-choice specifically because it decouples the cached value from any one
-language's type system — the same reason most polyglot or
-service-boundary-spanning caches (a cache a non-JVM process might also
-read, or one that needs to survive a class's field changes across
-deploys) favor JSON, Protobuf, or MessagePack over Java's native
-serialization. Java serialization specifically is widely documented (and
-was the subject of well-known CVEs) as a poor default for anything beyond
-same-process, same-classloader use — a large part of why frameworks and
-libraries have moved away from defaulting to it, and exactly the trap this
-project's `RedisCacheManager` default fell into.
+**Industry approaches**: Spring Data Redis's own reference documentation
+explicitly discusses this exact choice — it ships
+`JdkSerializationRedisSerializer` as the historical default for backward
+compatibility, while documenting `GenericJackson2JsonRedisSerializer`
+(and this project's Jackson-3.x equivalent) as the JSON-based alternative
+specifically for cross-version and cross-client compatibility, since a
+Java-serialized blob is opaque to anything that isn't a JVM running the
+exact same class version. That opacity problem is structural, not
+theoretical: Redis itself ships official clients for many languages
+(`redis-py`, `node-redis`, Jedis/Lettuce for Java, `go-redis`), and any
+of them reading a key written as raw Java serialization would get
+unusable bytes — a JSON or Protobuf/MessagePack value is the only kind
+any of those clients can actually use. Java serialization's security
+history reinforces the same point from a different angle: the
+`ysoserial`-style gadget-chain exploits publicly documented against
+real, named products (WebLogic, JBoss, Jenkins) around 2015-2017 —
+built on deserializing untrusted Java-serialized data via common
+libraries like Apache Commons Collections — are why frameworks and
+security guidance broadly steer away from Java serialization as a
+default for anything crossing a trust or process boundary, not just an
+interoperability concern.
 
 **Why this project differs (or doesn't)**: it doesn't differ from best
 practice — the fix moved *toward* the industry-preferred approach (JSON,

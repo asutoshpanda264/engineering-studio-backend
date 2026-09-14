@@ -27,9 +27,11 @@ the "JSONB fields" section of `explain_scenario.md`.
 next to indexed relational columns is a widely-used, explicitly-documented
 pattern — it's the reason JSONB (binary, indexable, queryable with
 operators like `@>` and GIN indexes) exists as distinct from plain `json`.
-GitLab and Shopify have both written publicly about using JSONB columns in
-Postgres for exactly this "structured core fields, flexible body" shape
-rather than fully normalizing every nested attribute into its own table.
+GitLab has written publicly about using JSONB columns in Postgres for
+exactly this "structured core fields, flexible body" shape rather than
+fully normalizing every nested attribute into its own table — a pattern
+widely reused across Postgres-backed applications generally, not
+something unique to one company.
 The alternative some systems reach for at this same problem — storing the
 whole record as a schemaless document — is MongoDB's core model; the
 trade-off there is giving up relational joins/transactions across documents

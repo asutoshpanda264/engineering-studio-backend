@@ -25,12 +25,12 @@ context involved. See `decisions.md` #1 and the formula walkthrough in
 **Industry approaches**: isolating pure calculation from side-effecting
 infrastructure is a widely-taught general pattern — Gary Bernhardt's
 "Boundaries" talk popularized the "functional core, imperative shell" name
-for exactly this shape, and it's the same reasoning behind keeping pricing
-engines, tax calculators, and game-scoring logic as pure functions in most
-production codebases (Stripe's own public engineering writing on their
-pricing/tax calculation emphasizes pure, deterministic core logic
-specifically so it can be unit tested exhaustively without a live API call).
-Game and gamification scoring systems generally converge on the same
+for exactly this shape, and it's the same reasoning generally cited for
+keeping pricing engines, tax calculators, and game-scoring logic as pure
+functions: a deterministic function of primitive inputs can be unit
+tested exhaustively, in isolation, without standing up a database or a
+live service call. Game and gamification scoring systems generally
+converge on the same
 approach — a scoring function that takes primitive inputs (accuracy, time,
 difficulty) and returns a number, callable identically from a live request
 handler, a batch recalculation job, or a test.

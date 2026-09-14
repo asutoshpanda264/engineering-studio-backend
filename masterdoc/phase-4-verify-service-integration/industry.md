@@ -172,10 +172,10 @@ validating it at runtime, an explicit, acknowledged gap (explain_verify.md,
   missing field, wrong type) fails with a clear validation error
   instead of a silent wrong answer elsewhere in the pipeline — a Zod
   schema at the `POST /verify` boundary would catch that class of
-  input error before it reaches scoring logic.
-  golden-master test only catches *this project's own* adapter code
-  producing a wrong shape internally, not an external caller sending
-  a malformed request.
+  input error before it reaches scoring logic. This project's own
+  golden-master test only catches *its own* adapter code producing a
+  wrong shape internally, not an external caller sending a malformed
+  request.
 - Gains: one fixture test now protects against the specific,
   historically-real bug class (structural mismatch between adapter and
   scoring logic) without adding a schema-validation dependency or
@@ -329,10 +329,8 @@ asking a reviewer to open two repos and infer the relationship. This
 is the opposite of Amazon/Netflix's reasoning (team-autonomy at scale)
 and doesn't try to claim Google/Meta's reasoning either (their tooling
 solves problems — cross-language atomic commits across thousands of
-engineers — this project doesn't have).
-
-**Why this project differs (or doesn't), continued**: the cost side is
-honestly named too — `decisions.md` #7 states the one real thing given
+engineers — this project doesn't have). The cost side is honestly named
+too — `decisions.md` #7 states the one real thing given
 up is independent git history/tags per service, and judges it a small
 cost given the project's size.
 

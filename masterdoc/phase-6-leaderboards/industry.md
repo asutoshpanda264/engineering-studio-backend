@@ -33,12 +33,14 @@ events happen at a rate (thousands per second in a live game) where
 re-aggregating from a system of record on every event isn't
 affordable. On the recompute side, the same "full rebuild from source"
 vs. "incremental update" choice is a long-standing, named trade-off in
-data-warehouse tooling: dbt's materialization strategies offer both
-`incremental` (append/merge only new rows) and a `--full-refresh` flag
-that rebuilds a table from scratch — teams commonly default to
-`full-refresh` for a model until incremental correctness bugs or
-runtime cost force the switch, which is close to this project's own
-trajectory in miniature.
+data-warehouse tooling: dbt offers both a `table` materialization
+(rebuild the whole thing from source on every run) and an `incremental`
+one (append/merge only new rows since last run) — and even
+`incremental` models keep a `--full-refresh` escape hatch specifically
+because incremental logic can silently drift from what a from-scratch
+rebuild would produce. Teams commonly stay on plain `table` for a model
+until its rebuild cost genuinely forces a move to `incremental`, which
+is close to this project's own trajectory in miniature.
 
 **Why this project differs (or doesn't)**: this project chose the
 recompute side for the same reason dbt users cite for staying on
@@ -101,10 +103,14 @@ Spring's own `@TransactionalEventListener(phase = AFTER_COMMIT)`,
 which this project uses directly, is the framework's documented,
 lighter-weight answer to the same ordering problem for **in-process**
 listeners — no separate outbox table or CDC process needed because
-publisher and listener share one JVM and one transaction manager.
-AWS's caching-strategy documentation describes the same "commit the
-real thing, then update the cache" ordering under the name
-**cache-aside** with write-behind timing.
+publisher and listener share one JVM and one transaction manager. This
+isn't quite either of the classic read-cache patterns (cache-aside
+populates a cache lazily on a read miss; write-behind writes to the
+cache first and the durable store second, the opposite order from what
+happens here) — Redis here is a derived materialized view kept in sync
+by a domain event, closer in shape to the outbox/CDC pattern above,
+just collapsed into a single in-process listener because there's no
+network boundary between the two stores to protect against.
 
 **Why this project differs (or doesn't)**: this is the same ordering
 industry uses, at the appropriate weight class for where the two
@@ -216,11 +222,14 @@ different difficulty and time limits."
 
 **Industry approaches**: normalizing heterogeneous performance into
 one comparable rating is a long-standing, well-documented problem in
-competitive ranking systems. Chess rating systems (Elo, and its
-refinement Glicko, used by chess.com and FIDE) convert "beat this
-specific opponent" into one portable number rather than tracking
-raw win/loss counts, specifically so performance against different
-opponents is comparable. Competitive programming judges like
+competitive ranking systems. Chess rating systems convert "beat this
+specific opponent" into one portable number rather than tracking raw
+win/loss counts, specifically so performance against different
+opponents is comparable — FIDE's official over-the-board ratings use
+the original Elo system; chess.com's online ratings publicly document
+using Glicko/Glicko-2 instead, a refinement that also tracks a
+confidence interval around each rating, not just the number itself.
+Competitive programming judges like
 Codeforces use a publicly documented rating algorithm that adjusts a
 contestant's rating based on the *relative* difficulty of the
 contest field, not raw solve count or solve time, for the same reason.
