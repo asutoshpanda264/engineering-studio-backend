@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.log
+test/
+vitest.config.ts
+sync-vendor.sh
+.git/

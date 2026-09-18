@@ -1,0 +1,104 @@
+# Local dev stack: api (Spring Boot) + verify (Node/Express) + Postgres +
+# Redis. See masterdoc/architecture.md for why these are two separate
+# services in the first place.
+#
+# engineering_studio (the frontend) is deliberately NOT included here — it's
+# a separate sibling repo you'll be iterating on the most, and runs better
+# natively via `npm run dev` for fast hot-reload. Point it at this stack the
+# same way as always: NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 in its
+# own .env.local.
+#
+# This is an ADDITIONAL way to run things, not a replacement — every
+# service here still runs exactly the same way it always has outside
+# Compose too (`./mvnw spring-boot:test-run`, `npm run dev` in verify/).
+# The only conflict is port contention if you try to run the same service
+# both ways at once.
+#
+# Usage:
+#   docker compose up --build       # everything, rebuilding images
+#   docker compose up api verify    # just these two (their own deps still start)
+#   docker compose logs -f api      # tail one service
+#   docker compose down             # stop everything (add -v to also drop the Postgres volume)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: engineering_studio
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    # No volume, deliberately — Redis here is a rebuildable projection of
+    # problem_progress (leaderboards) and a scenario-read cache, never the
+    # source of truth for anything (see phase-6-leaderboards/,
+    # phase-8-caching-and-rate-limiting/). Losing it on a restart is fine;
+    # it rebuilds itself from Postgres.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  verify:
+    build: ./verify
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      verify:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/engineering_studio
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VERIFY_SERVICE_URL: http://verify:4000
+      # Same dev-only fallback value application.yml itself ships (see its
+      # own comment there) — set explicitly here so this file is
+      # self-documenting rather than relying on the app's default. A real
+      # deploy must still override this.
+      JWT_SECRET: dev-only-secret-change-me-before-any-real-deployment-not-for-production-use
+      # engineering_studio runs natively (see the note at the top of this
+      # file), always on :3000 — the one origin the API needs to accept
+      # cross-origin requests from in local dev.
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+    healthcheck:
+      # Actuator's health indicator checks DB + Redis connectivity itself
+      # (both are auto-configured health contributors) — this one check
+      # transitively confirms the whole stack is actually reachable, not
+      # just that the JVM process started.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  postgres_data:
