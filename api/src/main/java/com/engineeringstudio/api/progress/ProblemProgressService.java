@@ -3,6 +3,7 @@ package com.engineeringstudio.api.progress;
 import com.engineeringstudio.api.attempt.Attempt;
 import com.engineeringstudio.api.attempt.AttemptMode;
 import com.engineeringstudio.api.attempt.verify.VerifyResult;
+import com.engineeringstudio.api.auth.Role;
 import com.engineeringstudio.api.points.PointsCalculator;
 import com.engineeringstudio.api.points.PointsLedgerEntry;
 import com.engineeringstudio.api.points.PointsLedgerRepository;
@@ -42,8 +43,29 @@ public class ProblemProgressService {
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * CONTRIBUTOR/ADMIN attempts never touch progress/points/leaderboard/
+     * streak — both roles can author or moderate scenarios
+     * ({@code ScenarioController}'s `hasAnyRole('ADMIN','CONTRIBUTOR')` on
+     * create, `hasRole('ADMIN')` on publish/archive/delete), which gives
+     * either one insider knowledge of a scenario's own scoring internals;
+     * letting that also count toward their own progress would be a real
+     * way to cheat (2025-09-19 chat, in the context of the contributor
+     * application flow). The attempt itself still gets verified/scored
+     * normally in {@code AttemptFinalizer}'s response — the Workshop
+     * behaves exactly the same for them — this just never persists past
+     * the `Attempt` row itself: no `problem_progress` row is even
+     * created/touched, no points ledger entry, no
+     * {@code ScenarioSolvedEvent}/{@code ProblemProgressUpgradedEvent}
+     * (so no streak or leaderboard update either, since those listen for
+     * exactly those events).
+     */
     @Transactional
     public void recordOutcome(Attempt attempt, Scenario scenario, VerifyResult verifyResult) {
+        if (attempt.getUser().getRole() != Role.USER) {
+            return;
+        }
+
         UUID userId = attempt.getUser().getId();
         String scenarioId = scenario.getId();
         Instant now = clock.instant();
