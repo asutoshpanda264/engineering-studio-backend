@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,16 +26,19 @@ public class ContributorApplicationService {
     private final UserRepository userRepository;
     private final ProblemProgressRepository problemProgressRepository;
     private final ContributorApplicationMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ContributorApplicationService(
             ContributorApplicationRepository applicationRepository,
             UserRepository userRepository,
             ProblemProgressRepository problemProgressRepository,
-            ContributorApplicationMapper mapper) {
+            ContributorApplicationMapper mapper,
+            ApplicationEventPublisher eventPublisher) {
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
         this.problemProgressRepository = problemProgressRepository;
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -111,7 +115,14 @@ public class ContributorApplicationService {
         application.setStatus(ContributorApplicationStatus.APPROVED);
         application.setReviewedAt(Instant.now());
         application.setReviewedBy(actorId);
-        return mapper.toResponse(applicationRepository.save(application));
+        ContributorApplicationResponse response = mapper.toResponse(applicationRepository.save(application));
+
+        // AFTER_COMMIT (see notification.EmailService) — queued here, inside
+        // the still-open transaction, but nothing actually sends until this
+        // transaction commits for real.
+        eventPublisher.publishEvent(new ContributorApplicationApprovedEvent(applicant.getId()));
+
+        return response;
     }
 
     @Transactional

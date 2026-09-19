@@ -39,14 +39,15 @@ Created when that phase's work starts, not pre-scaffolded ahead of time.
 Full scope of each numbered phase is in the approved build plan:
 `/home/asutosh/.claude/plans/lets-dicuss-more-what-zany-swing.md`.
 
-**Not one of the 9 numbered phases — a separate initiative, started once
+**Not one of the 9 numbered phases — separate initiatives, started once
 Phase 8 gave the frontend something real to connect to:**
 
 | Phase | Status | Folder |
 |---|---|---|
 | Frontend Integration — connecting `engineering_studio` (sibling repo) to this backend | ✅ Increments 1-6 done (auth foundation + Timed Challenge attempt/submit + leaderboard/daily-challenge pages + Workshop header signed-in indicator + NO_PRESSURE/free-play wiring + progress history page) — fully caught up to what the backend exposes | `phase-frontend-integration/` |
+| Contributor Pipeline — content submissions (`Contribution`), bug reports (`BugReport`), and self-service contributor applications (`ContributorApplication`) with a priority-ranked admin queue and a congrats email on approval | ✅ done, verified live | `phase-contributor-pipeline/` |
 
-Milestone 9 is deliberately on hold until this is done.
+Milestone 9 is deliberately on hold until Frontend Integration is done.
 
 ## Quick "I want to know X" lookup
 
@@ -172,3 +173,22 @@ Milestone 9 is deliberately on hold until this is done.
   (all 9, including `phase-frontend-integration/`) — per-mechanism
   industry comparisons with named real systems, and the honest
   trade-offs of this project's simpler approach vs. theirs.
+  (`phase-contributor-pipeline/` doesn't have one yet.)
+- *"How does someone actually become a CONTRIBUTOR or ADMIN?"* →
+  `phase-contributor-pipeline/README.md` — self-service application is
+  the only path to CONTRIBUTOR; the very first ADMIN is a direct
+  `UPDATE users SET role='ADMIN' ...` (see that file's bootstrap note),
+  every ADMIN after that comes from an approved application too.
+- *"Why can't a contributor or admin also solve problems for
+  points/leaderboard credit?"* →
+  `phase-contributor-pipeline/decisions.md` #7 — both roles can author
+  or moderate scenarios, which is real insider knowledge of a scenario's
+  own scoring; `ProblemProgressService.recordOutcome` freezes on role,
+  checked fresh on every submit.
+- *"Does this project send real emails yet?"* →
+  `phase-contributor-pipeline/decisions.md` #8-9 — the mechanism exists
+  (`notification.EmailService`, currently only wired to the
+  contributor-approval congrats email) but logs instead of sending until
+  real SMTP credentials are set via env vars. This also updates
+  `phase-7-daily-challenge-streaks/decisions.md` #1's "no notification/
+  email delivery mechanism" statement, which was accurate when written.

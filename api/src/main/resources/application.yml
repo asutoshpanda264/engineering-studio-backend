@@ -88,6 +88,18 @@ app:
     # "https://foo.com,https://bar.com" works for a real multi-origin
     # deploy without any code change.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  mail:
+    # notification.EmailService (2026-09-19 chat) — the contributor-
+    # approved congrats email. `host` unset (empty) by default: the
+    # service treats a blank host as "not configured yet" and logs
+    # instead of sending, so an approval never fails just because SMTP
+    # isn't wired up. Set these via env vars once real SMTP credentials
+    # exist (Gmail app password, Mailtrap, SendGrid, ...).
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:no-reply@engineeringstudio.dev}
 
 server:
   port: ${PORT:8080}
